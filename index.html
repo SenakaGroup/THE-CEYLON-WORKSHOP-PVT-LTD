@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Invoice Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --cream:#FAF1E4;
+    --cream-2:#F3E8D6;
+    --ink:#241F1A;
+    --ink-soft:#5B5449;
+    --rule:#D9CBB2;
+    --maroon:#7A2E22;
+    --accent:#B9895A;
+    font-family: 'Jost', sans-serif;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --cream:#1C1814;
+      --cream-2:#241F19;
+      --ink:#F2E9DC;
+      --ink-soft:#B9AD98;
+      --rule:#463C2E;
+      --maroon:#D98F7C;
+      --accent:#D9B98A;
+    }
+  }
+  :root[data-theme="dark"]{
+    --cream:#1C1814; --cream-2:#241F19; --ink:#F2E9DC; --ink-soft:#B9AD98; --rule:#463C2E; --maroon:#D98F7C; --accent:#D9B98A;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    min-height:100%;
+  }
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:36px 24px 80px;
+  }
+  .top{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+  }
+  .top h1{
+    font-family:'Fraunces', serif;
+    font-weight:500;
+    font-size:clamp(28px,4vw,38px);
+    margin:0;
+    letter-spacing:0.2px;
+  }
+  .top p{margin:4px 0 0; color:var(--ink-soft); font-size:14px;}
+  .layout{
+    display:grid;
+    grid-template-columns: minmax(300px, 420px) 1fr;
+    gap:28px;
+    align-items:start;
+  }
+  @media (max-width:880px){
+    .layout{grid-template-columns:1fr;}
+  }
+  .panel{
+    background:var(--cream-2);
+    border:1px solid var(--rule);
+    border-radius:6px;
+    padding:22px;
+  }
+  .panel h2{
+    font-family:'Fraunces', serif;
+    font-weight:500;
+    font-size:16px;
+    margin:0 0 14px;
+    padding-bottom:10px;
+    border-bottom:1px solid var(--rule);
+    color:var(--ink);
+  }
+  .field{margin-bottom:12px;}
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-bottom:4px;
+  }
+  .field input, .field textarea{
+    width:100%;
+    background:var(--cream);
+    border:1px solid var(--rule);
+    border-radius:4px;
+    padding:8px 10px;
+    font-family:'Jost',sans-serif;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .field textarea{resize:vertical; min-height:44px;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .items-head{
+    display:grid;
+    grid-template-columns: 46px 1fr 90px 90px 28px;
+    gap:8px;
+    font-size:11px;
+    color:var(--ink-soft);
+    padding: 0 2px 6px;
+  }
+  .item-row{
+    display:grid;
+    grid-template-columns: 46px 1fr 90px 90px 28px;
+    gap:8px;
+    margin-bottom:8px;
+    align-items:center;
+  }
+  .item-row input{
+    width:100%;
+    background:var(--cream);
+    border:1px solid var(--rule);
+    border-radius:4px;
+    padding:7px 8px;
+    font-size:13px;
+    color:var(--ink);
+    font-family:'Jost',sans-serif;
+  }
+  .rm-btn{
+    background:none;
+    border:none;
+    color:var(--maroon);
+    font-size:18px;
+    cursor:pointer;
+    line-height:1;
+    padding:4px;
+  }
+  .add-btn{
+    margin-top:4px;
+    background:none;
+    border:1px dashed var(--rule);
+    border-radius:4px;
+    color:var(--ink-soft);
+    padding:8px;
+    width:100%;
+    cursor:pointer;
+    font-family:'Jost',sans-serif;
+    font-size:13px;
+  }
+  .add-btn:hover{border-color:var(--accent); color:var(--ink);}
+  .discount-row{display:flex; align-items:center; gap:8px; margin-top:14px;}
+  .discount-row label{font-size:12px; color:var(--ink-soft); white-space:nowrap;}
+  .discount-row input{flex:1;}
+
+  /* Preview / invoice sheet */
+  .sheet-outer{
+    background:var(--cream-2);
+    border:1px solid var(--rule);
+    border-radius:6px;
+    padding:16px;
+  }
+  #sheet{
+    background:#FBF2E1;
+    color:#241F1A;
+    padding:56px 52px;
+    font-family:'Jost', sans-serif;
+    min-height:600px;
+  }
+  #sheet .s-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:34px;
+  }
+  #sheet h2.doc-title{
+    font-family:'Fraunces', serif;
+    font-weight:500;
+    font-size:40px;
+    margin:0 0 10px;
+    letter-spacing:0.5px;
+    border-bottom:1.5px solid #241F1A;
+    padding-bottom:14px;
+    display:inline-block;
+    min-width:220px;
+  }
+  #sheet .meta{margin-top:18px;}
+  #sheet .meta div{font-size:13px; margin-bottom:4px;}
+  #sheet .meta .label{color:#5B5449; display:inline-block; width:96px;}
+  #sheet .billed-label{font-weight:600; font-size:13px; margin-bottom:2px;}
+  #sheet .billed-name{font-size:15px; margin-bottom:16px;}
+  .logo-badge{
+    width:110px; height:130px;
+    border:1.3px solid #241F1A;
+    border-radius:50%/40%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center;
+    font-family:'Fraunces', serif;
+    flex-shrink:0;
+  }
+  .logo-badge .est{font-size:8px; letter-spacing:1.5px; color:#5B5449; margin-bottom:8px;}
+  .logo-badge .mono{font-size:30px; font-weight:600;}
+  .logo-badge .place{font-size:8px; letter-spacing:1.5px; color:#5B5449; margin-top:8px;}
+  table.items{width:100%; border-collapse:collapse; margin-top:10px;}
+  table.items thead th{
+    text-align:left;
+    font-size:13px;
+    font-weight:600;
+    padding:10px 6px 12px;
+    border-bottom:1.3px solid #241F1A;
+  }
+  table.items thead th.num{text-align:right;}
+  table.items thead th small{display:block; font-weight:400; color:#5B5449; font-size:10px;}
+  table.items tbody td{
+    padding:9px 6px;
+    font-size:13.5px;
+    border-bottom:none;
+  }
+  table.items tbody td.num{text-align:right;}
+  table.items tbody tr:last-child{border-bottom:1px solid #D9CBB2;}
+  .totals{
+    margin-top:22px;
+    display:flex;
+    justify-content:flex-end;
+  }
+  .totals-inner{width:280px;}
+  .totals-inner .line{
+    display:flex; justify-content:space-between;
+    font-size:13.5px; padding:4px 0; color:#5B5449;
+    border-top:1px solid #D9CBB2;
+  }
+  .totals-inner .line:first-child{border-top:none; padding-top:10px;}
+  .totals-inner .grand{
+    display:flex; justify-content:space-between;
+    font-family:'Fraunces', serif; font-weight:600; font-size:19px;
+    padding:14px 0; margin-top:6px;
+    border-top:1.3px solid #241F1A; border-bottom:1px solid #241F1A;
+    color:#241F1A;
+  }
+  .bottom{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    margin-top:60px; gap:20px; flex-wrap:wrap;
+  }
+  .bank-title{color:#7A2E22; font-weight:600; font-size:13px; border-bottom:1px solid #7A2E22; display:inline-block; padding-bottom:4px; margin-bottom:8px;}
+  .bank-lines div{font-size:11.5px; margin-bottom:2px; color:#3a342c;}
+  .thankyou{
+    font-family:'Fraunces', serif; font-size:22px; text-align:right; line-height:1.35; color:#241F1A;
+  }
+  .footer-contact{
+    margin-top:34px; display:flex; justify-content:space-between; font-size:12px; color:#5B5449;
+  }
+  .actions{
+    display:flex; gap:10px; margin-top:18px;
+  }
+  .btn{
+    flex:1;
+    padding:11px 14px;
+    border-radius:5px;
+    border:1px solid var(--rule);
+    background:var(--ink);
+    color:var(--cream);
+    font-family:'Jost', sans-serif;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .btn.secondary{
+    background:transparent;
+    color:var(--ink);
+  }
+  .btn:active{opacity:0.85;}
+  .status{font-size:12px; color:var(--ink-soft); margin-top:8px; min-height:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Invoice generator</h1>
+      <p>Fill in the details, watch the invoice build itself, then export a PDF.</p>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- FORM -->
+    <div class="panel">
+      <h2>Business</h2>
+      <div class="field"><label>Business name</label><input id="bizName" value="The Ceylon Workshop"></div>
+      <div class="row2">
+        <div class="field"><label>Established</label><input id="bizEst" value="2021"></div>
+        <div class="field"><label>Location tag</label><input id="bizPlace" value="Ceylon"></div>
+      </div>
+      <div class="field"><label>Logo initials</label><input id="bizInitials" value="A&C"></div>
+      <div class="field"><label>Contact email</label><input id="bizEmail" value="hello@apothecaryandco.com"></div>
+      <div class="field"><label>WhatsApp / phone</label><input id="bizPhone" value="+77 327 8391"></div>
+
+      <h2 style="margin-top:22px;">Invoice</h2>
+      <div class="row2">
+        <div class="field"><label>Invoice no.</label><input id="invNo" value="A0074"></div>
+        <div class="field"><label>Date</label><input id="invDate" value="3rd January 2025"></div>
+      </div>
+      <div class="field"><label>Billed to</label><input id="billedTo" value="Sennel N."></div>
+
+      <h2 style="margin-top:22px;">Line items</h2>
+      <div class="items-head">
+        <span>Qty</span><span>Description</span><span>Price</span><span>Total</span><span></span>
+      </div>
+      <div id="itemsBox"></div>
+      <button class="add-btn" onclick="addItem()">+ Add line item</button>
+
+      <div class="discount-row">
+        <label>Discount (LKR)</label>
+        <input id="discount" value="8600" inputmode="decimal">
+      </div>
+
+      <h2 style="margin-top:22px;">Bank details</h2>
+      <div class="field"><label>Account name</label><input id="bankName" value="THE CEYLON WORKSHOP PVT LTD"></div>
+      <div class="row2">
+        <div class="field"><label>Account no.</label><input id="bankAcc" value="100100011699"></div>
+        <div class="field"><label>Bank</label><input id="bankBank" value="Nations Trust Bank (NTB)"></div>
+      </div>
+      <div class="field"><label>Branch</label><input id="bankBranch" value="Battaramulla"></div>
+
+      <div class="field"><label>Closing note</label><textarea id="closing">Thank you for
+shopping
+local!</textarea></div>
+
+      <div class="actions">
+        <button class="btn" onclick="downloadPdf()">Download PDF</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <!-- PREVIEW -->
+    <div class="sheet-outer">
+      <div id="sheet"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let items = [
+  {qty:1, unit:'220g', desc:'Gaia Candle', price:8600},
+  {qty:1, unit:'220g', desc:'Amber Candle', price:8600},
+  {qty:1, unit:'220g', desc:'Botanica Candle', price:8600},
+  {qty:2, unit:'220g', desc:'Dulcet Candle', price:8600},
+  {qty:1, unit:'220g', desc:'Heal Candle', price:8600},
+];
+
+function fmt(n){
+  n = isNaN(n) ? 0 : n;
+  return n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function renderItemRows(){
+  const box = document.getElementById('itemsBox');
+  box.innerHTML = '';
+  items.forEach((it, i)=>{
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <input type="number" min="0" value="${it.qty}" oninput="items[${i}].qty=parseFloat(this.value)||0; refresh();">
+      <input type="text" value="${it.desc}" placeholder="Description (e.g. 220g Gaia Candle)" oninput="items[${i}].desc=this.value; refresh();">
+      <input type="number" min="0" value="${it.price}" oninput="items[${i}].price=parseFloat(this.value)||0; refresh();">
+      <input type="text" disabled value="${fmt(it.qty*it.price)}">
+      <button class="rm-btn" onclick="items.splice(${i},1); renderItemRows(); refresh();">&times;</button>
+    `;
+    box.appendChild(row);
+  });
+}
+
+function addItem(){
+  items.push({qty:1, unit:'', desc:'', price:0});
+  renderItemRows();
+  refresh();
+}
+
+function getVals(){
+  return {
+    bizName: document.getElementById('bizName').value,
+    bizEst: document.getElementById('bizEst').value,
+    bizPlace: document.getElementById('bizPlace').value,
+    bizInitials: document.getElementById('bizInitials').value,
+    bizEmail: document.getElementById('bizEmail').value,
+    bizPhone: document.getElementById('bizPhone').value,
+    invNo: document.getElementById('invNo').value,
+    invDate: document.getElementById('invDate').value,
+    billedTo: document.getElementById('billedTo').value,
+    discount: parseFloat(document.getElementById('discount').value) || 0,
+    bankName: document.getElementById('bankName').value,
+    bankAcc: document.getElementById('bankAcc').value,
+    bankBank: document.getElementById('bankBank').value,
+    bankBranch: document.getElementById('bankBranch').value,
+    closing: document.getElementById('closing').value,
+  };
+}
+
+function computeTotals(){
+  const subtotal = items.reduce((s,it)=> s + (it.qty*it.price), 0);
+  const v = getVals();
+  const total = subtotal - v.discount;
+  return {subtotal, discount:v.discount, total};
+}
+
+function renderSheet(){
+  const v = getVals();
+  const t = computeTotals();
+  const sheet = document.getElementById('sheet');
+
+  const rows = items.map(it => `
+    <tr>
+      <td>${it.qty.toString().padStart(2,'0')}</td>
+      <td>${it.desc || ''}</td>
+      <td class="num">${fmt(it.price)}</td>
+      <td class="num">${fmt(it.qty*it.price)}</td>
+    </tr>
+  `).join('');
+
+  sheet.innerHTML = `
+    <div class="s-top">
+      <div>
+        <h2 class="doc-title">Invoice</h2>
+        <div class="billed-label">Billed To</div>
+        <div class="billed-name">${v.billedTo}</div>
+        <div class="meta">
+          <div><span class="label">Invoice No.</span>${v.invNo}</div>
+          <div><span class="label">Date</span>${v.invDate}</div>
+        </div>
+      </div>
+      <div class="logo-badge">
+        <div class="est">- EST ${v.bizEst} -</div>
+        <div class="mono">${v.bizInitials}</div>
+        <div class="place">- ${v.bizPlace.toUpperCase()} -</div>
+      </div>
+    </div>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th style="width:60px;">QTY</th>
+          <th>Description</th>
+          <th class="num" style="width:110px;">Price<small>LKR</small></th>
+          <th class="num" style="width:110px;">Total<small>LKR</small></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div class="totals">
+      <div class="totals-inner">
+        <div class="line"><span>Sub-total:</span><span>${fmt(t.subtotal)}</span></div>
+        <div class="line"><span>Discount:</span><span>(${fmt(t.discount)})</span></div>
+        <div class="grand"><span>TOTAL:</span><span>${fmt(t.total)}</span></div>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <div>
+        <div class="bank-title">Bank Detail</div>
+        <div class="bank-lines">
+          <div><strong>${v.bankName}</strong></div>
+          <div>Account No.: <strong>${v.bankAcc}</strong></div>
+          <div>Bank: ${v.bankBank}</div>
+          <div>Branch: ${v.bankBranch}</div>
+        </div>
+      </div>
+      <div class="thankyou">${v.closing.split('\n').map(l=>l||'&nbsp;').join('<br>')}</div>
+    </div>
+
+    <div class="footer-contact">
+      <div>${v.bizEmail}</div>
+      <div style="text-align:right;">Contact<br>WhatsApp: ${v.bizPhone}</div>
+    </div>
+  `;
+}
+
+function refresh(){
+  renderSheet();
+}
+
+// initial render
+renderItemRows();
+refresh();
+[...document.querySelectorAll('.panel input, .panel textarea')].forEach(el=>{
+  el.addEventListener('input', refresh);
+});
+
+async function downloadPdf(){
+  const status = document.getElementById('status');
+  status.textContent = 'Generating PDF…';
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:'pt', format:'a4'});
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 50;
+    let y = 60;
+    const v = getVals();
+    const t = computeTotals();
+
+    const ink = '#241F1A';
+    const soft = '#5B5449';
+    const maroon = '#7A2E22';
+
+    doc.setTextColor(ink);
+    doc.setFont('times','normal');
+    doc.setFontSize(30);
+    doc.text('Invoice', margin, y);
+    doc.setDrawColor(ink);
+    doc.setLineWidth(1);
+    doc.line(margin, y+10, margin+180, y+10);
+
+    // logo badge (simple circle w/ text) top right
+    const cx = pageW - margin - 55, cy = 55, rx=55, ry=65;
+    doc.setLineWidth(1);
+    doc.ellipse(cx, cy, rx, ry);
+    doc.setFontSize(7);
+    doc.setTextColor(soft);
+    doc.text(`- EST ${v.bizEst} -`, cx, cy-28, {align:'center'});
+    doc.setFontSize(20);
+    doc.setTextColor(ink);
+    doc.text(v.bizInitials, cx, cy+6, {align:'center'});
+    doc.setFontSize(7);
+    doc.setTextColor(soft);
+    doc.text(`- ${v.bizPlace.toUpperCase()} -`, cx, cy+30, {align:'center'});
+
+    y += 40;
+    doc.setFontSize(11);
+    doc.setTextColor(ink);
+    doc.setFont('helvetica','bold');
+    doc.text('Billed To', margin, y);
+    y += 16;
+    doc.setFont('helvetica','normal');
+    doc.text(v.billedTo, margin, y);
+
+    y += 30;
+    doc.setFontSize(10.5);
+    doc.setTextColor(soft);
+    doc.text('Invoice No.', margin, y);
+    doc.setTextColor(ink);
+    doc.text(v.invNo, margin+90, y);
+    y += 16;
+    doc.setTextColor(soft);
+    doc.text('Date', margin, y);
+    doc.setTextColor(ink);
+    doc.text(v.invDate, margin+90, y);
+
+    y += 34;
+    doc.setDrawColor('#D9CBB2');
+    doc.setLineWidth(0.7);
+    doc.line(margin, y, pageW-margin, y);
+    y += 22;
+
+    // table header
+    doc.setFontSize(10.5);
+    doc.setTextColor(ink);
+    doc.setFont('helvetica','bold');
+    doc.text('QTY', margin, y);
+    doc.text('DESCRIPTION', margin+55, y);
+    doc.text('PRICE', pageW-margin-120, y, {align:'left'});
+    doc.text('TOTAL', pageW-margin, y, {align:'right'});
+    y += 6;
+    doc.setDrawColor(ink);
+    doc.setLineWidth(1);
+    doc.line(margin, y, pageW-margin, y);
+    y += 20;
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10.5);
+    items.forEach(it=>{
+      doc.text(it.qty.toString().padStart(2,'0'), margin, y);
+      const descLines = doc.splitTextToSize(it.desc || '', 280);
+      doc.text(descLines, margin+55, y);
+      doc.text(fmt(it.price), pageW-margin-120, y);
+      doc.text(fmt(it.qty*it.price), pageW-margin, y, {align:'right'});
+      y += 18 * descLines.length;
+    });
+
+    y += 20;
+    doc.setDrawColor('#D9CBB2');
+    doc.line(margin, y, pageW-margin, y);
+    y += 24;
+
+    const totalsX = pageW - margin - 200;
+    doc.setTextColor(soft);
+    doc.text('Sub-total:', totalsX, y);
+    doc.setTextColor(ink);
+    doc.text(fmt(t.subtotal), pageW-margin, y, {align:'right'});
+    y += 16;
+    doc.setTextColor(soft);
+    doc.text('Discount:', totalsX, y);
+    doc.setTextColor(ink);
+    doc.text(`(${fmt(t.discount)})`, pageW-margin, y, {align:'right'});
+    y += 18;
+    doc.setDrawColor(ink);
+    doc.line(totalsX-10, y, pageW-margin, y);
+    y += 22;
+    doc.setFont('times','normal');
+    doc.setFontSize(15);
+    doc.text('TOTAL:', totalsX, y);
+    doc.text(fmt(t.total), pageW-margin, y, {align:'right'});
+    y += 8;
+    doc.setDrawColor(ink);
+    doc.line(totalsX-10, y, pageW-margin, y);
+
+    y += 70;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(maroon);
+    doc.text('Bank Detail', margin, y);
+    doc.setDrawColor(maroon);
+    doc.line(margin, y+3, margin+70, y+3);
+    y += 18;
+    doc.setFontSize(9.5);
+    doc.setTextColor(ink);
+    doc.setFont('helvetica','bold');
+    doc.text(v.bankName, margin, y);
+    y += 14;
+    doc.setFont('helvetica','normal');
+    doc.text(`Account No.: ${v.bankAcc}`, margin, y);
+    y += 13;
+    doc.text(`Bank: ${v.bankBank}`, margin, y);
+    y += 13;
+    doc.text(`Branch: ${v.bankBranch}`, margin, y);
+
+    doc.setFont('times','normal');
+    doc.setFontSize(15);
+    doc.setTextColor(ink);
+    const closingLines = v.closing.split('\n');
+    let cy2 = y - 40;
+    closingLines.forEach(line=>{
+      doc.text(line, pageW-margin, cy2, {align:'right'});
+      cy2 += 18;
+    });
+
+    y += 50;
+    doc.setDrawColor('#D9CBB2');
+    doc.line(margin, y, pageW-margin, y);
+    y += 18;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(soft);
+    doc.text(v.bizEmail, margin, y);
+    doc.text('Contact', pageW-margin, y-8, {align:'right'});
+    doc.text(`WhatsApp: ${v.bizPhone}`, pageW-margin, y+6, {align:'right'});
+
+    const pdfBlob = doc.output('blob');
+    const filename = `Invoice-${v.invNo || 'draft'}.pdf`;
+
+    const downloads = await (window.claude ? window.claude.use('downloads') : Promise.resolve(null));
+    if (downloads) {
+      await downloads.save({ filename, data: pdfBlob });
+      status.textContent = 'PDF saved.';
+    } else {
+      // fallback for preview / non-runtime environments
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      status.textContent = 'PDF downloaded.';
+    }
+  }catch(e){
+    status.textContent = 'Could not generate PDF.';
+    console.error(e);
+  }
+}
+</script>
+</body>
+</html>
